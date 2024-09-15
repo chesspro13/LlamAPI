@@ -1,7 +1,7 @@
 import { Router, Response, Request } from "express";
 import {fileURLToPath} from "url";
 import path from "path";
-import {LlamaModel, LlamaContext, LlamaChatSession} from "node-llama-cpp";
+import {LlamaModel, LlamaContext, LlamaChatSession, LlamaJsonSchemaGrammar} from "node-llama-cpp";
 
 export const router = Router();
 
@@ -11,6 +11,21 @@ const model = new LlamaModel({
     modelPath: path.join(__dirname, "../models", "capybarahermes-2.5-mistral-7b.Q4_K_M.gguf"),
     gpuLayers: 128
 });
+
+const grammer = new LlamaJsonSchemaGrammar({
+    "type": "object",
+    "properties": {
+        "V1": {
+            "type": "string"
+        },
+        "V2": {
+            "type": "string"
+        },
+        "V3": {
+            "type": "string"
+        }
+    }
+} as const);
 
 function prompt( userPackage: string){
     return `<|im_start|>system
@@ -32,12 +47,8 @@ router.post("/status", (req: Request, res: Response) => {
     const context = new LlamaContext({model});
     const session = new LlamaChatSession({context});
     console.log( req.body.package )
-    session.prompt(prompt(req.body.package)).then(a => {
+    session.prompt(prompt(req.body.package), { grammar: grammer, maxTokens: context.getContextSize() }).then(a => {
         console.log("\n\nGenerated Text: [" + a + "]")
-        var cleanJson = "{" + a.toString().split("{")[1].split("}")[0] + "}";
-        cleanJson = cleanJson.replaceAll("\\n","").replaceAll("\n","")
-        cleanJson = cleanJson.replaceAll("\\","").replaceAll(/\s+/g,' ').trim();
-        console.log("Clean JSON: [" + cleanJson + "]")
-        res.send( {result: "success", message: cleanJson }  )
+        res.send( {result: "success", message: grammer.parse(a) }  )
     });
 });

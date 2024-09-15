@@ -2,6 +2,7 @@ import express from "express";
 import { router as apiRouter } from "./api.js";
 import { config } from "dotenv";
 import cors from "cors";
+import helmet from "helmet";
 
 // Environment Variables
 config();
@@ -16,6 +17,7 @@ const options: cors.CorsOptions = {
 // API
 const api = express();
 api.use(express.json());
+api.use(helmet());
 api.use(cors(options));
 
 api.use("/api", apiRouter);
