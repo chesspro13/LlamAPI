@@ -1,14 +1,23 @@
-import { Router, Response, Request } from "express";
+import { Router, Response, Request, NextFunction } from "express";
 import {fileURLToPath} from "url";
 import path from "path";
 import {LlamaModel, LlamaContext, LlamaChatSession, LlamaJsonSchemaGrammar} from "node-llama-cpp";
+import cors from "cors";
 
 export const router = Router();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const llm = process.env.LLM_MODEL;
+if ( llm === undefined)
+    throw new Error("NO LLM GIVEN");
 
+const originURL = process.env.ORIGIN_URL;
+if ( originURL === undefined)
+    throw new Error("NO ORIGIN URL GIVEN");
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+        
 const model = new LlamaModel({
-    modelPath: path.join(__dirname, "../models", "capybarahermes-2.5-mistral-7b.Q4_K_M.gguf"),
+    modelPath: path.join(__dirname, "../models", llm),
     gpuLayers: 128
 });
 
@@ -43,12 +52,39 @@ function prompt( userPackage: string){
         <|im_start|>assistant`
 }
 
-router.post("/status", (req: Request, res: Response) => {
+router.use(
+    cors({ origin: originURL}));
+
+router.use(function(req: Request, res: Response, next: NextFunction) {
+    res.header("Access-Control-Allow-Orgin", originURL)
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+    
+    if ('OPTIONS' === req.method) {
+        //respond with 200
+        res.send(200);
+      }
+      else {
+      //move on
+        next();
+      }
+})
+
+router.get("/testing", (req: Request, res: Response) => {
+    res.send( {result: "success" }  )
+});
+
+router.post("/status", async (req: Request, res: Response) => {
     const context = new LlamaContext({model});
     const session = new LlamaChatSession({context});
-    console.log( req.body.package )
-    session.prompt(prompt(req.body.package), { grammar: grammer, maxTokens: context.getContextSize() }).then(a => {
+
+    await session.prompt(prompt(req.body.package), { grammar: grammer, maxTokens: context.getContextSize() }).then(a => {
         console.log("\n\nGenerated Text: [" + a + "]")
-        res.send( {result: "success", message: grammer.parse(a) }  )
+        res.status(200).send( {result: "success", message: grammer.parse(a) }  )
     });
 });
+
+router.post("/test", (req: Request, res: Response) => {
+    res.send( {result: "success" }  )
+});
+
