@@ -3,6 +3,10 @@ import {fileURLToPath} from "url";
 import path from "path";
 import {LlamaModel, LlamaContext, LlamaChatSession, LlamaJsonSchemaGrammar} from "node-llama-cpp";
 import cors from "cors";
+import {config} from "dotenv"
+
+
+config();
 
 export const router = Router();
 
@@ -18,7 +22,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
         
 const model = new LlamaModel({
     modelPath: path.join(__dirname, "../models", llm),
-    gpuLayers: 128
+    gpuLayers: 33
 });
 
 const grammer = new LlamaJsonSchemaGrammar({
@@ -32,6 +36,18 @@ const grammer = new LlamaJsonSchemaGrammar({
         },
         "V3": {
             "type": "string"
+        },
+        "V1_Reason": {
+            "type": "string"
+        },
+        "V2_Reason": {
+            "type": "string"
+        },
+        "V3_Reason": {
+            "type": "string"
+        },
+        "Feedback": {
+            "type": "string"
         }
     }
 } as const);
@@ -44,7 +60,8 @@ function prompt( userPackage: string){
         The performance statement should be one sentence and written in past tense. It should also include transition words like "by" and "which".
         Personal pronouns (I, me, my, we, us, our, etc.) should not be used.
         Rewrite the USER prompt to follow these conventions. 
-        Generate Three seporate and unique ways to rewrite what you were given in JSON format labled "V1", "V2", and "V3".
+        Generate Three seporate and unique ways to rewrite what you were given in JSON format labled "V1", "V2", and "V3", and how it has improved in "V1_Reason", "V2_Reason", and "V3_Reason".
+        At the very end generate impartial feedback on how to improve the statement in JSON labled "Feedback"
         <|im_end|>
         <|im_start|>user
         ` + userPackage + `
@@ -77,10 +94,14 @@ router.get("/testing", (req: Request, res: Response) => {
 router.post("/status", async (req: Request, res: Response) => {
     const context = new LlamaContext({model});
     const session = new LlamaChatSession({context});
-
-    await session.prompt(prompt(req.body.package), { grammar: grammer, maxTokens: context.getContextSize() }).then(a => {
+	console.log( req.body.data.package )
+    await session.prompt(prompt(req.body.data.package), { grammar: grammer, maxTokens: context.getContextSize() }).then(a => {
         console.log("\n\nGenerated Text: [" + a + "]")
         res.status(200).send( {result: "success", message: grammer.parse(a) }  )
+    }).catch( result => {
+        console.log("ERROR: " + result)
+        console.log("OFFENDING PROMPT: " + req.body.data.package)
+        res.sendStatus(500)
     });
 });
 

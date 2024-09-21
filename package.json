@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "server": "tsx src/app.ts",
+    "server": "CUDACXX=/usr/local/cuda-12.6/bin/nvcc tsx src/app.ts",
     "start-react": "react-scripts start & npm run start",
     "build-react": "BUILD_PATH='./server_src/build' react-scripts build",
     "test-react": "react-scripts test",
