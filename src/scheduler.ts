@@ -4,6 +4,7 @@ import { config } from "dotenv";
 import Queue, { DoneCallback, Job } from "bull";
 import redis from "ioredis";
 import axios from "axios";
+import { sanitize } from "string-sanitizer";
 import { v4 as uuidV4 } from "uuid";
 
 config();
@@ -119,7 +120,7 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
   await getAiNode().then(async (node) => {
     await axios
       .post(node + "/generate", {
-        data: { package: job.data.package },
+        data: { package: sanitize(job.data.package) },
       })
       .then((result) => {
         if (result.data.error !== undefined) {
