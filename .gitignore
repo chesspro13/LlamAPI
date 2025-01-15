@@ -2,3 +2,6 @@ node_modules
 models/*
 dist/*
 .env
+llama/*
+keys/
+compose.yaml

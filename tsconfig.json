@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "ESNext",
     "lib": [
       "dom",
       "dom.iterable",
@@ -22,7 +22,7 @@
     "outDir": "./dist/"
   },
   "include": [
-    "src/*.ts"
+    "src/**/*.ts"
   ],
   "exclude": ["node_modules/**, src/* "],
   "ts-node": {"files": true}

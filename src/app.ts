@@ -1,11 +1,12 @@
 import express from "express";
-import { router as apiRouter } from "./api.js";
+import { router as apiRouter } from "./scheduler.js";
 import { config } from "dotenv";
 import helmet from "helmet";
 
 // Environment Variables
 config();
 const API_PORT = process.env.API_PORT || 27415
+
 
 // API
 const api = express();
