@@ -1,10 +1,11 @@
 {
   "name": "llamapi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "server": "tsx src/app.ts",
+    "server": "node /app/app.js",
+    "server-ts": "tsx src/app.ts",
     "start-react": "react-scripts start & npm run start",
     "build-react": "BUILD_PATH='./server_src/build' react-scripts build",
     "test-react": "react-scripts test",

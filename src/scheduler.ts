@@ -79,7 +79,7 @@ function updateAverageProcessingTime() {
       if (count > 0) {
         const averageValue = totalSum / count;
         AverageProcessingTime = totalSum / count;
-        console.log("Average value over last minute: " + AverageProcessingTime);
+        // console.log("Average value over last minute: " + AverageProcessingTime);
       }
     }
   });
@@ -109,7 +109,7 @@ async function getAiNode() {
 jobQueue.process(async (job: Job, done: DoneCallback) => {
   const data = job.data;
   const startTime = Date.now();
-  console.log("Job data: " + job.data.status);
+  console.log("Starting job...");
 
   if (job.data.status == "Removed") {
     done();
@@ -129,11 +129,12 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
           const feedback = job.data;
           job.update(feedback);
           done();
+          console.log("Job complete.");
         }
       })
       .catch((error) => {
-        console.log(error);
         done(new Error("Unable to generate feedback"));
+        console.log("Error while generating!");
       });
   });
 });
@@ -156,7 +157,7 @@ router.use(function (req: Request, res: Response, next: NextFunction) {
 });
 
 router.post("/queue", async (req: Request, res: Response) => {
-  if (req.body.data.current_job !== null) {
+  if (req.body.data.current_job !== null && req.body.data.current_job !== undefined) {
     console.log("Canceling existing job [" + req.body.data.current_job + "]");
     jobQueue.getJob(req.body.data.current_job).then((job) => {
       job?.update({ status: "Removed" });
@@ -174,6 +175,7 @@ router.post("/queue", async (req: Request, res: Response) => {
       res.status(200).json({ jobID: id.id });
     })
     .catch((err) => {
+      console.log( err );
       res.sendStatus(500);
     });
 });
@@ -183,20 +185,18 @@ router.post("/status/:id", async (req: Request, res: Response) => {
   const job = await jobQueue.getJob(id);
 
   if (job === null) {
-    console.log("Job null??");
     res.status(500);
     return;
   }
 
   job.getState().then((status) => {
     if (status == "completed") {
-      console.log("Final Data Thing: " + JSON.stringify(job.data));
       job.remove();
       res.status(200).send({ status: "completed", data: job.data.feedback });
     } else {
       const timeRemaining = Date.now() - job.data.startTime;
-      console.log(job.data.startTime);
-      console.log("Time remaining: " + timeRemaining);
+      // console.log(job.data.startTime);
+      // console.log("Time remaining: " + timeRemaining);
       res.status(200).send({ status: status, timeRemaining: timeRemaining });
     }
   });
