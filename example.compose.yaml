@@ -8,6 +8,7 @@ services:
       ORIGIN_URL: <ORIGIN URL>
       AI_NODES: <Nodes IP>
       AI_MODEL: <AI Model>
+      CUSTOM_PROMPT: <true | false>
       REDIS_HOST: cache
       REDIS_PORT: 6379
       REDIS_PASSWORD: <REDIS PASSWORD>
