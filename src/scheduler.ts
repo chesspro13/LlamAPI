@@ -6,6 +6,7 @@ import redis from "ioredis";
 import axios from "axios";
 import { sanitize } from "string-sanitizer";
 import { v4 as uuidV4 } from "uuid";
+import { readFileSync, existsSync } from "fs";
 
 config();
 
@@ -17,18 +18,27 @@ if (envs.REDIS_HOST === undefined) throw new Error("REDIS_HOST is undefined!");
 if (envs.REDIS_PORT === undefined) throw new Error("REDIS_PORT is undefined!");
 if (envs.AI_NODE === undefined) throw new Error("AI_NODE is undefined!");
 if (envs.ORIGIN_URL === undefined) throw new Error("ORIGIN_URL is undefined!");
+if (envs.CUSTOM_PROMPT === undefined) throw new Error("CUSTOM_PROMPT is undefined!");
 if (process.env.AI_NODES === undefined)
   throw new Error("AI_NODES is undefined!");
 
-const prompt = `Narrative Statements are a narrative style used to communicate accomplishments and results in the United States Air Force. They should be efficient and increase clarity of an Airman's performance.
-                  In the United States Air Force, Narrative Statements should be a standalone sentence with action and at least one of impact or results/outcome and written in plain language without uncommon acronyms and abbreviations.
-                  The first word of a narrative statement should be a strong action verb.
-                  The performance statement should be one sentence and written in past tense. It should also include transition words like "by" and "which".
-                  Personal pronouns (I, me, my, we, us, our, etc.) should not be used.
-                  Rewrite the USER prompt to follow these conventions. 
-                  Generate Three seporate and unique ways to rewrite what you were given in JSON format labled "V1", "V2", and "V3", and how it has improved in "V1_Reason", "V2_Reason", and "V3_Reason".
-                  Generate impartial feedback on how the user can improve the statement in a JSON object labled "Feedback"`;
+const prompt = getPrompt();
 
+function getPrompt() { 
+  if (envs.CUSTOM_PROMPT != "true" || !existsSync("./prompt.txt"))
+    return `Narrative Statements are a narrative style used to communicate accomplishments and results in the United States Air Force. They should be efficient and increase clarity of an Airman's performance.
+      In the United States Air Force, Narrative Statements should be a standalone sentence with action and at least one of impact or results/outcome and written in plain language without uncommon acronyms and abbreviations.
+      The first word of a narrative statement should be a strong action verb.
+      The performance statement should be one sentence and written in past tense. It should also include transition words like "by" and "which".
+      Personal pronouns (I, me, my, we, us, our, etc.) should not be used.
+      Rewrite the USER prompt to follow these conventions. 
+      Generate Three seporate and unique ways to rewrite what you were given in JSON format labled "V1", "V2", and "V3", and how it has improved in "V1_Reason", "V2_Reason", and "V3_Reason".
+      Generate impartial feedback on how the user can improve the statement in a JSON object labled "Feedback"`;
+  else 
+    return readFileSync("./prompt.txt");
+}
+
+console.log( "Using prompt: [" + prompt + "]");
 
 const json_schema = {
   "type": "object",
