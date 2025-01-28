@@ -20,6 +20,76 @@ if (envs.ORIGIN_URL === undefined) throw new Error("ORIGIN_URL is undefined!");
 if (process.env.AI_NODES === undefined)
   throw new Error("AI_NODES is undefined!");
 
+const prompt = `Narrative Statements are a narrative style used to communicate accomplishments and results in the United States Air Force. They should be efficient and increase clarity of an Airman's performance.
+                  In the United States Air Force, Narrative Statements should be a standalone sentence with action and at least one of impact or results/outcome and written in plain language without uncommon acronyms and abbreviations.
+                  The first word of a narrative statement should be a strong action verb.
+                  The performance statement should be one sentence and written in past tense. It should also include transition words like "by" and "which".
+                  Personal pronouns (I, me, my, we, us, our, etc.) should not be used.
+                  Rewrite the USER prompt to follow these conventions. 
+                  Generate Three seporate and unique ways to rewrite what you were given in JSON format labled "V1", "V2", and "V3", and how it has improved in "V1_Reason", "V2_Reason", and "V3_Reason".
+                  Generate impartial feedback on how the user can improve the statement in a JSON object labled "Feedback"`;
+
+
+const json_schema = {
+  "type": "object",
+  "required": [
+      "V1",
+      "V2",
+      "V3",
+      "Feedback"
+  ],
+  "properties": {
+      "V1": {
+          "type": "object",
+          "required": [
+              "new_statement",
+              "reasoning"
+          ],
+          "properties": {
+              "new_statement": {
+                  "type": "string"
+              },
+              "reasoning": {
+                  "type": "string"
+              }
+          }
+      },
+      "V2": {
+          "type": "object",
+          "required": [
+              "new_statement",
+              "reasoning"
+          ],
+          "properties": {
+              "new_statement": {
+                  "type": "string"
+              },
+              "reasoning": {
+                  "type": "string"
+              }
+          }
+      },
+      "V3": {
+          "type": "object",
+          "required": [
+              "new_statement",
+              "reasoning"
+          ],
+          "properties": {
+              "new_statement": {
+                  "type": "string"
+              },
+              "reasoning": {
+                  "type": "string"
+              }
+          }
+      },
+      "Feedback": {
+          "type": "string"
+      }
+  }
+}
+
 const redisConfig = {
   host: envs.REDIS_HOST || "localhost",
   port: parseInt(envs.REDIS_PORT) || 6379,
@@ -87,6 +157,7 @@ function updateAverageProcessingTime() {
   client.disconnect(true);
 }
 
+// TODO: This is unused. Need to make it work with multiple nodes!
 async function getAiNode() {
   //TODO: Round robin a list of nodes
   for (let i = 0; i < nodes().length; i++) {
@@ -116,19 +187,20 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
     done();
     return;
   }
+
+  console.log("Sending job to [" + process.env.AI_NODE + "/generate]");
   // const update = job.data.startTime = startTime;
-  await getAiNode().then(async (node) => {
-    await axios
-      .post(node + "/generate", {
-        data: { package: sanitize(job.data.package) },
+    await axios.post(process.env.AI_NODE + "/generate", {
+        "model": process.env.AI_MODEL,
+        "prompt": prompt + " user input: "  + sanitize(job.data.package),
+        "format": json_schema,
+        "stream": false,
       })
       .then((result) => {
         if (result.data.error !== undefined) {
           console.log("Problem with server: " + result.data.error);
         } else {
-          job.data.feedback = result.data.Feedback;
-          const feedback = job.data;
-          job.update(feedback);
+          job.update({response: result.data.response});
           done();
           console.log("Job complete.");
         }
@@ -136,9 +208,9 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
       .catch((error) => {
         done(new Error("Unable to generate feedback"));
         console.log("Error while generating!");
+        console.log( error);
       });
   });
-});
 
 router.use(cors({ origin: process.env.ORIGIN_URL }));
 
@@ -181,7 +253,7 @@ router.post("/queue", async (req: Request, res: Response) => {
     });
 });
 
-router.post("/status/:id", async (req: Request, res: Response) => {
+router.get("/status/:id", async (req: Request, res: Response) => {
   const id = req.params.id;
   const job = await jobQueue.getJob(id);
 
@@ -193,12 +265,12 @@ router.post("/status/:id", async (req: Request, res: Response) => {
   job.getState().then((status) => {
     if (status == "completed") {
       job.remove();
-      res.status(200).send({ status: "completed", data: job.data.feedback });
+      res.status(200).json({ status: "completed", data: job.data.response });
     } else {
-      const timeRemaining = Date.now() - job.data.startTime;
+      // const timeRemaining = Date.now() - job.data.startTime;
       // console.log(job.data.startTime);
       // console.log("Time remaining: " + timeRemaining);
-      res.status(200).send({ status: status, timeRemaining: timeRemaining });
+      res.status(200).send({ status: status });
     }
   });
 });

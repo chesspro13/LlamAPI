@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "server": "node /app/app.js",
-    "server-ts": "tsx src/app.ts",
+    "server-ts": "tsx /app/app.ts",
+    "dev-server-ts": "tsx ./src/app.ts",
     "start-react": "react-scripts start & npm run start",
     "build-react": "BUILD_PATH='./server_src/build' react-scripts build",
     "test-react": "react-scripts test",

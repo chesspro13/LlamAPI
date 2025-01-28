@@ -5,3 +5,5 @@ dist/*
 llama/*
 keys/
 compose.yaml
+dev.sh
+old.env
