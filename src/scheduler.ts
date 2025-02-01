@@ -198,14 +198,25 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
     return;
   }
 
+  let user_prompt : string = "";
+
+  if ( job.data.prompt != "" && job.data.prompt != undefined )
+  {
+    user_prompt = (job.data.prompt).toString();
+  }
+  else
+    user_prompt = prompt.toString();
+
+  const params = {
+    "model": process.env.AI_MODEL,
+    "prompt": user_prompt + " user input: "  + (job.data.package).toString(),
+    "format": json_schema,
+    "stream": false,
+  }
+
   console.log("Sending job to [" + process.env.AI_NODE + "/generate]");
   // const update = job.data.startTime = startTime;
-    await axios.post(process.env.AI_NODE + "/generate", {
-        "model": process.env.AI_MODEL,
-        "prompt": prompt + " user input: "  + sanitize(job.data.package),
-        "format": json_schema,
-        "stream": false,
-      })
+    await axios.post(process.env.AI_NODE + "/generate", params)
       .then((result) => {
         if (result.data.error !== undefined) {
           console.log("Problem with server: " + result.data.error);
@@ -225,8 +236,11 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
 router.use(cors({ origin: process.env.ORIGIN_URL }));
 
 router.use(function (req: Request, res: Response, next: NextFunction) {
+  if( process.env.ORIGIN_URL === undefined)
+    return
+
   res.header("Access-Control-Allow-Orgin", process.env.ORIGIN_URL);
-  res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.header("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
   res.header(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept"
@@ -263,6 +277,28 @@ router.post("/queue", async (req: Request, res: Response) => {
     });
 });
 
+router.post("/prompt-queue", async (req: Request, res: Response) => {
+  if (req.body.data.current_job !== null && req.body.data.current_job !== undefined) {
+    console.log("Canceling existing job [" + req.body.data.current_job + "]");
+    jobQueue.getJob(req.body.data.current_job).then((job) => {
+      job?.update({ status: "Removed" });
+    });
+  }
+
+  const uuid = uuidV4()
+
+  const job = jobQueue.add( 
+    { package: req.body.data.package, prompt: req.body.data.prompt },
+    { jobId: uuid },
+  ).then( (job) => {
+    console.log("job [" + job.id + "] queued!");
+    res.status(200).json({jobID: job.id})
+  }).catch((err) => {
+    console.log( err );
+    res.sendStatus(500);
+  });
+});
+
 router.get("/status/:id", async (req: Request, res: Response) => {
   const id = req.params.id;
   const job = await jobQueue.getJob(id);
@@ -279,7 +315,7 @@ router.get("/status/:id", async (req: Request, res: Response) => {
     } else {
       // const timeRemaining = Date.now() - job.data.startTime;
       // console.log(job.data.startTime);
-      // console.log("Time remaining: " + timeRemaining);
+      console.log("Processing [" + job.data.uuid + "]");
       res.status(200).send({ status: status });
     }
   });
