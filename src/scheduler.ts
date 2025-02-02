@@ -188,6 +188,16 @@ async function getAiNode() {
   }
 }
 
+async function getQueuePosition(jobId:string) {
+  const activeJobs = await jobQueue.getActive();
+  if ( activeJobs.find( (job) => job.id == jobId  ))
+    return 0;
+
+  const quededJobs = await jobQueue.getWaiting();
+  const index = quededJobs.findIndex( (job) => job.id == jobId );
+  return index + 1;
+}
+
 jobQueue.process(async (job: Job, done: DoneCallback) => {
   const data = job.data;
   const startTime = Date.now();
@@ -304,7 +314,8 @@ router.get("/status/:id", async (req: Request, res: Response) => {
   const job = await jobQueue.getJob(id);
 
   if (job === null) {
-    res.status(500);
+    console.log("NULL JOB");
+    res.status(500).send({error: "Job null!"});
     return;
   }
 
@@ -315,8 +326,10 @@ router.get("/status/:id", async (req: Request, res: Response) => {
     } else {
       // const timeRemaining = Date.now() - job.data.startTime;
       // console.log(job.data.startTime);
-      console.log("Processing [" + job.data.uuid + "]");
-      res.status(200).send({ status: status });
+      console.log("Processing [" + id + "]");
+      getQueuePosition( id ).then( (position) => 
+        res.status(200).send({ status: status, position: position })
+      ).catch( () => res.status(500));
     }
   });
 });
