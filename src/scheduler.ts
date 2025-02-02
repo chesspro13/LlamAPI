@@ -24,7 +24,7 @@ if (process.env.AI_NODES === undefined)
 
 const prompt = getPrompt();
 
-function getPrompt() { 
+function getPrompt() {
   if (envs.CUSTOM_PROMPT != "true" || !existsSync("./prompt.txt"))
     return `Narrative Statements are a narrative style used to communicate accomplishments and results in the United States Air Force. They should be efficient and increase clarity of an Airman's performance.
       In the United States Air Force, Narrative Statements should be a standalone sentence with action and at least one of impact or results/outcome and written in plain language without uncommon acronyms and abbreviations.
@@ -34,69 +34,69 @@ function getPrompt() {
       Rewrite the USER prompt to follow these conventions. 
       Generate Three seporate and unique ways to rewrite what you were given in JSON format labled "V1", "V2", and "V3", and how it has improved in "V1_Reason", "V2_Reason", and "V3_Reason".
       Generate impartial feedback on how the user can improve the statement in a JSON object labled "Feedback"`;
-  else 
+  else
     return readFileSync("./prompt.txt");
 }
 
-console.log( "Using prompt: [" + prompt + "]");
+console.log("Using prompt: [" + prompt + "]");
 
 const json_schema = {
   "type": "object",
   "required": [
-      "V1",
-      "V2",
-      "V3",
-      "Feedback"
+    "V1",
+    "V2",
+    "V3",
+    "Feedback"
   ],
   "properties": {
-      "V1": {
-          "type": "object",
-          "required": [
-              "new_statement",
-              "reasoning"
-          ],
-          "properties": {
-              "new_statement": {
-                  "type": "string"
-              },
-              "reasoning": {
-                  "type": "string"
-              }
-          }
-      },
-      "V2": {
-          "type": "object",
-          "required": [
-              "new_statement",
-              "reasoning"
-          ],
-          "properties": {
-              "new_statement": {
-                  "type": "string"
-              },
-              "reasoning": {
-                  "type": "string"
-              }
-          }
-      },
-      "V3": {
-          "type": "object",
-          "required": [
-              "new_statement",
-              "reasoning"
-          ],
-          "properties": {
-              "new_statement": {
-                  "type": "string"
-              },
-              "reasoning": {
-                  "type": "string"
-              }
-          }
-      },
-      "Feedback": {
+    "V1": {
+      "type": "object",
+      "required": [
+        "new_statement",
+        "reasoning"
+      ],
+      "properties": {
+        "new_statement": {
           "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
+        }
       }
+    },
+    "V2": {
+      "type": "object",
+      "required": [
+        "new_statement",
+        "reasoning"
+      ],
+      "properties": {
+        "new_statement": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
+        }
+      }
+    },
+    "V3": {
+      "type": "object",
+      "required": [
+        "new_statement",
+        "reasoning"
+      ],
+      "properties": {
+        "new_statement": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
+        }
+      }
+    },
+    "Feedback": {
+      "type": "string"
+    }
   }
 }
 
@@ -188,13 +188,13 @@ async function getAiNode() {
   }
 }
 
-async function getQueuePosition(jobId:string) {
+async function getQueuePosition(jobId: string) {
   const activeJobs = await jobQueue.getActive();
-  if ( activeJobs.find( (job) => job.id == jobId  ))
+  if (activeJobs.find((job) => job.id == jobId))
     return 0;
 
   const quededJobs = await jobQueue.getWaiting();
-  const index = quededJobs.findIndex( (job) => job.id == jobId );
+  const index = quededJobs.findIndex((job) => job.id == jobId);
   return index + 1;
 }
 
@@ -208,10 +208,9 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
     return;
   }
 
-  let user_prompt : string = "";
+  let user_prompt: string = "";
 
-  if ( job.data.prompt != "" && job.data.prompt != undefined )
-  {
+  if (job.data.prompt != "" && job.data.prompt != undefined) {
     user_prompt = (job.data.prompt).toString();
   }
   else
@@ -219,37 +218,46 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
 
   const params = {
     "model": process.env.AI_MODEL,
-    "prompt": user_prompt + " user input: "  + (job.data.package).toString(),
+    "prompt": user_prompt + " user input: " + (job.data.package).toString(),
     "format": json_schema,
     "stream": false,
   }
 
   console.log("Sending job to [" + process.env.AI_NODE + "/generate]");
   // const update = job.data.startTime = startTime;
-    await axios.post(process.env.AI_NODE + "/generate", params)
-      .then((result) => {
-        if (result.data.error !== undefined) {
-          console.log("Problem with server: " + result.data.error);
-        } else {
-          job.update({response: result.data.response});
-          done();
-          console.log("Job complete.");
-        }
-      })
-      .catch((error) => {
-        done(new Error("Unable to generate feedback"));
-        console.log("Error while generating!");
-        console.log( error);
-      });
-  });
+  await axios.post(process.env.AI_NODE + "/generate", params)
+    .then((result) => {
+      if (result.data.error !== undefined) {
+        console.log("Problem with server: " + result.data.error);
+      } else {
+        job.update({ response: result.data.response });
+        done();
+        console.log("Job complete.");
+      }
+    })
+    .catch((error) => {
+      done(new Error("Unable to generate feedback"));
+      console.log("Error while generating!");
+      console.log(error);
+    });
+});
 
-router.use(cors({ origin: process.env.ORIGIN_URL }));
+
+
+// router.use(cors({ origin: process.env.ORIGIN_URL }));
+router.use(cors());
 
 router.use(function (req: Request, res: Response, next: NextFunction) {
-  if( process.env.ORIGIN_URL === undefined)
+  const allowedOrgins = process.env.ORIGIN_URL;
+  const origin = req.headers.origin;
+  if (allowedOrgins === undefined || origin === undefined) {
+    res.sendStatus(500)
     return
+  }
 
-  res.header("Access-Control-Allow-Orgin", process.env.ORIGIN_URL);
+  if (allowedOrgins.split(" ").includes(origin))
+
+    res.header("Access-Control-Allow-Orgin", origin);
   res.header("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
   res.header(
     "Access-Control-Allow-Headers",
@@ -282,7 +290,7 @@ router.post("/queue", async (req: Request, res: Response) => {
       res.status(200).json({ jobID: id.id });
     })
     .catch((err) => {
-      console.log( err );
+      console.log(err);
       res.sendStatus(500);
     });
 });
@@ -297,14 +305,14 @@ router.post("/prompt-queue", async (req: Request, res: Response) => {
 
   const uuid = uuidV4()
 
-  const job = jobQueue.add( 
+  const job = jobQueue.add(
     { package: req.body.data.package, prompt: req.body.data.prompt },
     { jobId: uuid },
-  ).then( (job) => {
+  ).then((job) => {
     console.log("job [" + job.id + "] queued!");
-    res.status(200).json({jobID: job.id})
+    res.status(200).json({ jobID: job.id })
   }).catch((err) => {
-    console.log( err );
+    console.log(err);
     res.sendStatus(500);
   });
 });
@@ -315,7 +323,7 @@ router.get("/status/:id", async (req: Request, res: Response) => {
 
   if (job === null) {
     console.log("NULL JOB");
-    res.status(500).send({error: "Job null!"});
+    res.status(500).send({ error: "Job null!" });
     return;
   }
 
@@ -327,9 +335,20 @@ router.get("/status/:id", async (req: Request, res: Response) => {
       // const timeRemaining = Date.now() - job.data.startTime;
       // console.log(job.data.startTime);
       console.log("Processing [" + id + "]");
-      getQueuePosition( id ).then( (position) => 
+      getQueuePosition(id).then((position) =>
         res.status(200).send({ status: status, position: position })
-      ).catch( () => res.status(500));
+      ).catch(() => res.status(500));
     }
   });
+});
+
+
+router.get("/version", async (req: Request, res: Response) => {
+  if ( process.env.VERSION === undefined )
+  {
+    res.sendStatus(500);
+    return
+  }
+
+  res.sendStatus(200).json({version: process.env.VERSION });
 });
