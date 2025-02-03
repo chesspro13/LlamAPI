@@ -3,12 +3,15 @@ FROM node:alpine3.20
 WORKDIR /app
 
 COPY package.json /app
-COPY --chown=node:node ./dist/* /app
+COPY yarn.lock /app
 
-RUN yarn install
+COPY --chown=node:node ./dist/* /app
+COPY --chown=node:node ./src /app
+
+RUN yarn install 
 
 USER node
 
 EXPOSE 27415
 
-CMD ["npm", "run", "server"]
+CMD ["yarn", "run", "server-ts"]

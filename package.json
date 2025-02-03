@@ -1,11 +1,12 @@
 {
   "name": "llamapi",
-  "version": "0.2.1",
+  "version": "0.2.4",
   "private": true,
   "type": "module",
   "scripts": {
     "server": "node /app/app.js",
-    "server-ts": "tsx src/app.ts",
+    "server-ts": "tsx /app/app.ts",
+    "dev-server-ts": "tsx ./src/app.ts",
     "start-react": "react-scripts start & npm run start",
     "build-react": "BUILD_PATH='./server_src/build' react-scripts build",
     "test-react": "react-scripts test",
@@ -35,7 +36,6 @@
     "redis": "^4.7.0",
     "string-sanitizer": "^2.0.2",
     "tsx": "^4.19.1",
-    "typescript": "^4.9.5",
     "uuid": "^10.0.0",
     "yarn": "^1.22.22"
   },
@@ -47,7 +47,8 @@
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@types/redis": "^4.0.11",
-    "@types/uuid": "^10.0.0"
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.7.3"
   },
   "browserslist": {
     "production": [

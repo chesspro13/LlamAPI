@@ -6,6 +6,7 @@ import redis from "ioredis";
 import axios from "axios";
 import { sanitize } from "string-sanitizer";
 import { v4 as uuidV4 } from "uuid";
+import { readFileSync, existsSync } from "fs";
 
 config();
 
@@ -17,8 +18,87 @@ if (envs.REDIS_HOST === undefined) throw new Error("REDIS_HOST is undefined!");
 if (envs.REDIS_PORT === undefined) throw new Error("REDIS_PORT is undefined!");
 if (envs.AI_NODE === undefined) throw new Error("AI_NODE is undefined!");
 if (envs.ORIGIN_URL === undefined) throw new Error("ORIGIN_URL is undefined!");
+if (envs.CUSTOM_PROMPT === undefined) throw new Error("CUSTOM_PROMPT is undefined!");
 if (process.env.AI_NODES === undefined)
   throw new Error("AI_NODES is undefined!");
+
+const prompt = getPrompt();
+
+function getPrompt() {
+  if (envs.CUSTOM_PROMPT != "true" || !existsSync("./prompt.txt"))
+    return `Narrative Statements are a narrative style used to communicate accomplishments and results in the United States Air Force. They should be efficient and increase clarity of an Airman's performance.
+      In the United States Air Force, Narrative Statements should be a standalone sentence with action and at least one of impact or results/outcome and written in plain language without uncommon acronyms and abbreviations.
+      The first word of a narrative statement should be a strong action verb.
+      The performance statement should be one sentence and written in past tense. It should also include transition words like "by" and "which".
+      Personal pronouns (I, me, my, we, us, our, etc.) should not be used.
+      Rewrite the USER prompt to follow these conventions. 
+      Generate Three seporate and unique ways to rewrite what you were given in JSON format labled "V1", "V2", and "V3", and how it has improved in "V1_Reason", "V2_Reason", and "V3_Reason".
+      Generate impartial feedback on how the user can improve the statement in a JSON object labled "Feedback"`;
+  else
+    return readFileSync("./prompt.txt");
+}
+
+console.log("Using prompt: [" + prompt + "]");
+
+const json_schema = {
+  "type": "object",
+  "required": [
+    "V1",
+    "V2",
+    "V3",
+    "Feedback"
+  ],
+  "properties": {
+    "V1": {
+      "type": "object",
+      "required": [
+        "new_statement",
+        "reasoning"
+      ],
+      "properties": {
+        "new_statement": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
+        }
+      }
+    },
+    "V2": {
+      "type": "object",
+      "required": [
+        "new_statement",
+        "reasoning"
+      ],
+      "properties": {
+        "new_statement": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
+        }
+      }
+    },
+    "V3": {
+      "type": "object",
+      "required": [
+        "new_statement",
+        "reasoning"
+      ],
+      "properties": {
+        "new_statement": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
+        }
+      }
+    },
+    "Feedback": {
+      "type": "string"
+    }
+  }
+}
 
 const redisConfig = {
   host: envs.REDIS_HOST || "localhost",
@@ -87,6 +167,7 @@ function updateAverageProcessingTime() {
   client.disconnect(true);
 }
 
+// TODO: This is unused. Need to make it work with multiple nodes!
 async function getAiNode() {
   //TODO: Round robin a list of nodes
   for (let i = 0; i < nodes().length; i++) {
@@ -107,6 +188,16 @@ async function getAiNode() {
   }
 }
 
+async function getQueuePosition(jobId: string) {
+  const activeJobs = await jobQueue.getActive();
+  if (activeJobs.find((job) => job.id == jobId))
+    return 0;
+
+  const quededJobs = await jobQueue.getWaiting();
+  const index = quededJobs.findIndex((job) => job.id == jobId);
+  return index + 1;
+}
+
 jobQueue.process(async (job: Job, done: DoneCallback) => {
   const data = job.data;
   const startTime = Date.now();
@@ -116,35 +207,58 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
     done();
     return;
   }
+
+  let user_prompt: string = "";
+
+  if (job.data.prompt != "" && job.data.prompt != undefined) {
+    user_prompt = (job.data.prompt).toString();
+  }
+  else
+    user_prompt = prompt.toString();
+
+  const params = {
+    "model": process.env.AI_MODEL,
+    "prompt": user_prompt + " user input: " + (job.data.package).toString(),
+    "format": json_schema,
+    "stream": false,
+  }
+
+  console.log("Sending job to [" + process.env.AI_NODE + "/generate]");
   // const update = job.data.startTime = startTime;
-  await getAiNode().then(async (node) => {
-    await axios
-      .post(node + "/generate", {
-        data: { package: sanitize(job.data.package) },
-      })
-      .then((result) => {
-        if (result.data.error !== undefined) {
-          console.log("Problem with server: " + result.data.error);
-        } else {
-          job.data.feedback = result.data.Feedback;
-          const feedback = job.data;
-          job.update(feedback);
-          done();
-          console.log("Job complete.");
-        }
-      })
-      .catch((error) => {
-        done(new Error("Unable to generate feedback"));
-        console.log("Error while generating!");
-      });
-  });
+  await axios.post(process.env.AI_NODE + "/generate", params)
+    .then((result) => {
+      if (result.data.error !== undefined) {
+        console.log("Problem with server: " + result.data.error);
+      } else {
+        job.update({ response: result.data.response });
+        done();
+        console.log("Job complete.");
+      }
+    })
+    .catch((error) => {
+      done(new Error("Unable to generate feedback"));
+      console.log("Error while generating!");
+      console.log(error);
+    });
 });
 
-router.use(cors({ origin: process.env.ORIGIN_URL }));
+
+
+// router.use(cors({ origin: process.env.ORIGIN_URL }));
+router.use(cors());
 
 router.use(function (req: Request, res: Response, next: NextFunction) {
-  res.header("Access-Control-Allow-Orgin", process.env.ORIGIN_URL);
-  res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+  const allowedOrgins = process.env.ORIGIN_URL;
+  const origin = req.headers.origin;
+  if (allowedOrgins === undefined || origin === undefined) {
+    res.sendStatus(500)
+    return
+  }
+
+  if (allowedOrgins.split(" ").includes(origin))
+
+    res.header("Access-Control-Allow-Orgin", origin);
+  res.header("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
   res.header(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept"
@@ -176,29 +290,65 @@ router.post("/queue", async (req: Request, res: Response) => {
       res.status(200).json({ jobID: id.id });
     })
     .catch((err) => {
-      console.log( err );
+      console.log(err);
       res.sendStatus(500);
     });
 });
 
-router.post("/status/:id", async (req: Request, res: Response) => {
+router.post("/prompt-queue", async (req: Request, res: Response) => {
+  if (req.body.data.current_job !== null && req.body.data.current_job !== undefined) {
+    console.log("Canceling existing job [" + req.body.data.current_job + "]");
+    jobQueue.getJob(req.body.data.current_job).then((job) => {
+      job?.update({ status: "Removed" });
+    });
+  }
+
+  const uuid = uuidV4()
+
+  const job = jobQueue.add(
+    { package: req.body.data.package, prompt: req.body.data.prompt },
+    { jobId: uuid },
+  ).then((job) => {
+    console.log("job [" + job.id + "] queued!");
+    res.status(200).json({ jobID: job.id })
+  }).catch((err) => {
+    console.log(err);
+    res.sendStatus(500);
+  });
+});
+
+router.get("/status/:id", async (req: Request, res: Response) => {
   const id = req.params.id;
   const job = await jobQueue.getJob(id);
 
   if (job === null) {
-    res.status(500);
+    console.log("NULL JOB");
+    res.status(500).send({ error: "Job null!" });
     return;
   }
 
   job.getState().then((status) => {
     if (status == "completed") {
       job.remove();
-      res.status(200).send({ status: "completed", data: job.data.feedback });
+      res.status(200).json({ status: "completed", data: job.data.response });
     } else {
-      const timeRemaining = Date.now() - job.data.startTime;
+      // const timeRemaining = Date.now() - job.data.startTime;
       // console.log(job.data.startTime);
-      // console.log("Time remaining: " + timeRemaining);
-      res.status(200).send({ status: status, timeRemaining: timeRemaining });
+      console.log("Processing [" + id + "]");
+      getQueuePosition(id).then((position) =>
+        res.status(200).send({ status: status, position: position })
+      ).catch(() => res.status(500));
     }
   });
+});
+
+
+router.get("/version", async (req: Request, res: Response) => {
+  if ( process.env.VERSION === undefined )
+  {
+    res.sendStatus(500);
+    return
+  }
+
+  res.sendStatus(200).json({version: process.env.VERSION });
 });
