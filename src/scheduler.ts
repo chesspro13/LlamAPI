@@ -38,7 +38,7 @@ function getPrompt() {
     return readFileSync("./prompt.txt");
 }
 
-console.log("Using prompt: [" + prompt + "]");
+// console.log("Using prompt: [" + prompt + "]");
 
 const json_schema = {
   "type": "object",
@@ -113,7 +113,7 @@ const redisConfig = {
   removeOnFailure: true,
 };
 
-const jobQueue = Queue("jobQueue4", { redis: redisConfig });
+const jobQueue = Queue("jobQueue4");
 const processingTimes = Queue("processingTime", { redis: redisConfig });
 
 const nodes = () => {
@@ -212,7 +212,7 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
 
   if (job.data.prompt != "" && job.data.prompt != undefined) {
     user_prompt = (job.data.prompt).toString();
-  }
+  } 
   else
     user_prompt = prompt.toString();
 
@@ -223,9 +223,9 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
     "stream": false,
   }
 
-  console.log("Sending job to [" + process.env.AI_NODE + "/generate]");
+  console.log("Sending job to [" + process.env.AI_NODE + "/api/generate]");
   // const update = job.data.startTime = startTime;
-  await axios.post(process.env.AI_NODE + "/generate", params)
+  await axios.post(process.env.AI_NODE + "/api/generate", params)
     .then((result) => {
       if (result.data.error !== undefined) {
         console.log("Problem with server: " + result.data.error);
@@ -247,29 +247,6 @@ jobQueue.process(async (job: Job, done: DoneCallback) => {
 // router.use(cors({ origin: process.env.ORIGIN_URL }));
 router.use(cors());
 
-router.use(function (req: Request, res: Response, next: NextFunction) {
-  const allowedOrgins = process.env.ORIGIN_URL;
-  const origin = req.headers.origin;
-  if (allowedOrgins === undefined || origin === undefined) {
-    res.sendStatus(500)
-    return
-  }
-
-  if (allowedOrgins.split(" ").includes(origin))
-
-    res.header("Access-Control-Allow-Orgin", origin);
-  res.header("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
-  );
-
-  if ("OPTIONS" === req.method) {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
 
 router.post("/queue", async (req: Request, res: Response) => {
   if (req.body.data.current_job !== null && req.body.data.current_job !== undefined) {
@@ -291,7 +268,7 @@ router.post("/queue", async (req: Request, res: Response) => {
     })
     .catch((err) => {
       console.log(err);
-      res.sendStatus(500);
+      res.sendStatus(515);
     });
 });
 
@@ -313,7 +290,7 @@ router.post("/prompt-queue", async (req: Request, res: Response) => {
     res.status(200).json({ jobID: job.id })
   }).catch((err) => {
     console.log(err);
-    res.sendStatus(500);
+    res.sendStatus(514);
   });
 });
 
@@ -337,7 +314,7 @@ router.get("/status/:id", async (req: Request, res: Response) => {
       console.log("Processing [" + id + "]");
       getQueuePosition(id).then((position) =>
         res.status(200).send({ status: status, position: position })
-      ).catch(() => res.status(500));
+      ).catch(() => res.status(513));
     }
   });
 });
