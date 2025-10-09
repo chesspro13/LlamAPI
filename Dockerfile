@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package.json /app
 COPY yarn.lock /app
 
-COPY --chown=node:node ./dist/* /app
+# COPY --chown=node:node ./dist/* /app
 COPY --chown=node:node ./src /app
 
 RUN yarn install 

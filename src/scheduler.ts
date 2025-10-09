@@ -113,8 +113,8 @@ const redisConfig = {
   removeOnFailure: true,
 };
 
-const jobQueue = Queue("jobQueue4");
-const processingTimes = Queue("processingTime", { redis: redisConfig });
+const jobQueue = Queue("jobQueue4", { redis: redisConfig });
+// const processingTimes = Queue("processingTime", { redis: redisConfig });
 
 const nodes = () => {
   const nodeList = process.env.AI_NODES;
@@ -249,6 +249,7 @@ router.use(cors());
 
 
 router.post("/queue", async (req: Request, res: Response) => {
+  console.log("New job received");
   if (req.body.data.current_job !== null && req.body.data.current_job !== undefined) {
     console.log("Canceling existing job [" + req.body.data.current_job + "]");
     jobQueue.getJob(req.body.data.current_job).then((job) => {
